@@ -1,44 +1,147 @@
 const express = require('express');
 
-// You will need `users-model.js` and `posts-model.js` both
-// The middleware functions also need to be required
+const Users = require('./userDb.js');
+const Posts = require('../posts/postDb.js');
 
 const router = express.Router();
 
+router.post('/', validateUser, (req, res) => {
+  
+  Users.insert(req.body)
+    .then(user => {
+      res.status(201).json(user);
+    })
+    .catch(error => {
+      
+      console.log('POST /api/users Error', error);
+
+      res.status(500).json({ error: 'We ran into an error creating the user' });
+    });
+});
+
+router.post('/:id/posts', validateUserId, validatePost, (req, res) => {
+  const postData = { ...req.body, user_id: req.params.id };
+
+  Posts.insert(postData)
+    .then(post => {
+      res.status(201).json(post);
+    })
+    .catch(error => {
+      
+      console.log('POST /api/users/:id/posts Error', error);
+
+      res.status(500).json({ error: 'We ran into an error creating the post' });
+    });
+});
+
 router.get('/', (req, res) => {
-  // RETURN AN ARRAY WITH ALL THE USERS
+  Users.get()
+    .then(users => {
+      res.status(200).json(users);
+    })
+    .catch(error => {
+      
+      console.log('GET /api/users Error', error);
+
+      res
+        .status(500)
+        .json({ error: 'We ran into an error retrieving the users' });
+    });
 });
 
-router.get('/:id', (req, res) => {
-  // RETURN THE USER OBJECT
-  // this needs a middleware to verify user id
+router.get('/', (req, res) => {
+  Users.get()
+    .then(users => {
+      res.status(200).json(users);
+    })
+    .catch(error => {
+      console.log('GET /api/users Error', error);
+
+      res
+        .status(500)
+        .json({ error: 'We ran into an error retrieving the users' });
+    });
 });
 
-router.post('/', (req, res) => {
-  // RETURN THE NEWLY CREATED USER OBJECT
-  // this needs a middleware to check that the request body is valid
+router.get('/:id/posts', validateUserId, (req, res) => {
+  Users.getUserPosts(req.params.id)
+    .then(posts => {
+      res.status(200).json(posts);
+    })
+    .catch(error => {
+      console.log('GET /api/user/:id/posts Error', error);
+
+      res
+        .status(500)
+        .json({ error: "We ran into an error retrieving the user's posts" });
+    });
 });
 
-router.put('/:id', (req, res) => {
-  // RETURN THE FRESHLY UPDATED USER OBJECT
-  // this needs a middleware to verify user id
-  // and another middleware to check that the request body is valid
+router.delete('/:id', validateUserId, (req, res) => {
+  Users.remove(req.params.id)
+    .then(() => {
+      res.status(200).json({ message: 'user deleted successfully' });
+    })
+    .catch(error => {
+      console.log('DELETE /api/user/:id Error', error);
+
+      res.status(500).json({ error: 'We ran into an error removing the user' });
+    });
 });
 
-router.delete('/:id', (req, res) => {
-  // RETURN THE FRESHLY DELETED USER OBJECT
-  // this needs a middleware to verify user id
+router.put('/:id', validateUserId, validateUser, (req, res) => {
+  Users.update(req.params.id, req.body)
+    .then(() => {
+      res.status(200).json({ message: 'User updated successfully' });
+    })
+    .catch(error => {
+      console.log('PUT /api/user/:id Error', error);
+
+      res.status(500).json({ error: 'We ran into an error removing the user' });
+    });
 });
 
-router.get('/:id/posts', (req, res) => {
-  // RETURN THE ARRAY OF USER POSTS
-  // this needs a middleware to verify user id
-});
 
-router.post('/:id/posts', (req, res) => {
-  // RETURN THE NEWLY CREATED USER POST
-  // this needs a middleware to verify user id
-  // and another middleware to check that the request body is valid
-});
 
-// do not forget to export the router
+function validateUserId(req, res, next) {
+  Users.getById(req.params.id)
+    .then(user => {
+      if (user) {
+        req.user = user;
+
+        next();
+      } else {
+        res.status(400).json({ message: 'Invalid user id' });
+      }
+    })
+    .catch(error => {
+      
+      console.log('validateUserId() Error', error);
+
+      res
+        .status(500)
+        .json({ error: 'We ran into an error searching for the user' });
+    });
+}
+
+function validateUser(req, res, next) {
+  if (!req.body || Object.keys(req.body).length === 0) {
+    res.status(400).json({ message: 'missing user data' });
+  } else if (!req.body.name) {
+    res.status(400).json({ message: 'missing required name field' });
+  } else {
+    next();
+  }
+}
+
+function validatePost(req, res, next) {
+  if (!req.body || Object.keys(req.body).length === 0) {
+    res.status(400).json({ message: 'missing post data' });
+  } else if (!req.body.text) {
+    res.status(400).json({ message: 'missing required text field' });
+  } else {
+    next();
+  }
+}
+
+module.exports = router;
